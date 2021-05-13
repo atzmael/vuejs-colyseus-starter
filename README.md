@@ -29,3 +29,13 @@ yarn lint
 See [Configuration Reference](https://cli.vuejs.org/config/).
 
 ## Server side
+
+### Project setup
+```
+npm install
+```
+
+### Compiles and hot-reloads for development
+```
+npm start
+```
