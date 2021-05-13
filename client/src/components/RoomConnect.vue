@@ -80,7 +80,9 @@ export default class HelloWorld extends Vue {
       this.username = item;
     }
 
-    this.connectToServer();
+    if (this.$store.state.client == null) {
+      this.connectToServer();
+    }
   }
 
   mounted(): void {
@@ -99,38 +101,44 @@ export default class HelloWorld extends Vue {
 
   bindServerListener(): void {
     // try reducing listener to avoid processus
-    this.$store.state.room!.onMessage("serverPacket", (packet: ServerPacket) => {
-      switch (packet.type) {
-        case "server_logs":
-          console.log("Log from server:", packet.content);
-          break;
-        case "notifs":
-          this.notifications.push(packet.content);
-          // Limit the number of saved messages in array
-          if (this.notifications.length > 5) {
-            this.notifications.shift();
-          }
-          break;
-        case "chat":
-          this.conversations.push(packet.content);
-          // Limit the number of saved messages in array
-          if (this.conversations.length > 5) {
-            this.conversations.shift();
-          }
-          break;
-        case "your_infos":
-          var datas = {
-            player: packet.content,
-            roomID: this.$store.state.room!.id,
-            expiration: new Date().getTime() + 120 * 1000,
-          };
-          this.$store.commit("updateProfil", packet.content); // For testing $store usage in the /profil page
+    this.$store.state.room!.onMessage(
+      "serverPacket",
+      (packet: ServerPacket) => {
+        switch (packet.type) {
+          case "server_logs":
+            console.log("Log from server:", packet.content);
+            break;
+          case "notifs":
+            this.notifications.push(packet.content);
+            // Limit the number of saved messages in array
+            if (this.notifications.length > 5) {
+              this.notifications.shift();
+            }
+            break;
+          case "chat":
+            this.conversations.push(packet.content);
+            // Limit the number of saved messages in array
+            if (this.conversations.length > 5) {
+              this.conversations.shift();
+            }
+            break;
+          case "your_infos":
+            var datas = {
+              player: packet.content,
+              roomID: this.$store.state.room!.id,
+              expiration: new Date().getTime() + 120 * 1000,
+            };
+            this.$store.commit("updateProfil", packet.content); // For testing $store usage in the /profil page
 
-          localStorage.setItem(`player_infos`, JSON.stringify(datas));
-          localStorage.setItem(`username`, this.$store.state.profil!.username);
-          break;
+            localStorage.setItem(`player_infos`, JSON.stringify(datas));
+            localStorage.setItem(
+              `username`,
+              this.$store.state.profil!.username
+            );
+            break;
+        }
       }
-    });
+    );
   }
 
   async createRoom(): Promise<void> {
