@@ -1,11 +1,6 @@
-# VueJS + Colyseus Starter
+# client
 
-Project to quick start application using VueJS client side and Colyseus server side.
-Multiplayer game or in-app live connection between users.
-
-## Client side
-
-### Project setup
+## Project setup
 ```
 yarn install
 ```
@@ -27,5 +22,3 @@ yarn lint
 
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
-
-## Server side
