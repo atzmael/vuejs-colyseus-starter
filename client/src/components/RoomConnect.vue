@@ -1,6 +1,6 @@
 <template>
   <div class="roomConnect">
-    <div v-if="room == null" class="connection">
+    <div v-if="$store.state.room == null" class="connection">
       <label>
         <p>Choisissez votre nom d'utilisateur</p>
         <input
@@ -26,7 +26,7 @@
       <button class="btn join-btn" v-on:click="joinRoom">Join</button>
     </div>
 
-    <div v-if="room !== null">
+    <div v-if="$store.state.room !== null">
       <button v-on:click="copyCode">Copier le code</button>
 
       <label>
@@ -50,6 +50,8 @@
 <script lang="ts">
 import { Vue } from "vue-class-component";
 import { Client } from "colyseus.js";
+import { Store } from "vuex";
+import { StoreState } from "@/interfaces/StoreState";
 
 interface ServerPacket {
   type: string;
@@ -57,21 +59,20 @@ interface ServerPacket {
 }
 
 export default class HelloWorld extends Vue {
-  msg!: string;
-  client: any = null;
-  room: any = null;
-  player: any = null;
-  players: Array<{}> = [];
   $refs!: {
     inputUsername: HTMLInputElement;
     inputRoomID: HTMLInputElement;
     inputChat: HTMLInputElement;
   };
+  $store!: Store<StoreState>;
+
+  players: Array<{}> = [];
+
   username: string = "";
-  streamerMode: boolean = false;
-  roomID: string | null = null;
   notifications: Array<string> = [];
   conversations: Array<string> = [];
+
+  unwatch!: any;
 
   created(): void {
     let item = localStorage.getItem("username");
@@ -89,7 +90,7 @@ export default class HelloWorld extends Vue {
   async connectToServer(): Promise<void> {
     try {
       let client = await new Client("ws://localhost:2567");
-      this.client = client;
+      this.$store.commit("updateClient", client);
       console.log("Client initialized:", client);
     } catch (e) {
       console.log("Client couldn't be initialized:", e);
@@ -98,7 +99,7 @@ export default class HelloWorld extends Vue {
 
   bindServerListener(): void {
     // try reducing listener to avoid processus
-    this.room.onMessage("serverPacket", (packet: ServerPacket) => {
+    this.$store.state.room!.onMessage("serverPacket", (packet: ServerPacket) => {
       switch (packet.type) {
         case "server_logs":
           console.log("Log from server:", packet.content);
@@ -118,14 +119,15 @@ export default class HelloWorld extends Vue {
           }
           break;
         case "your_infos":
-          this.player = packet.content;
           var datas = {
             player: packet.content,
-            roomId: this.room.id,
+            roomID: this.$store.state.room!.id,
             expiration: new Date().getTime() + 120 * 1000,
           };
+          this.$store.commit("updateProfil", packet.content); // For testing $store usage in the /profil page
+
           localStorage.setItem(`player_infos`, JSON.stringify(datas));
-          localStorage.setItem(`username`, this.player.username);
+          localStorage.setItem(`username`, this.$store.state.profil!.username);
           break;
       }
     });
@@ -133,11 +135,11 @@ export default class HelloWorld extends Vue {
 
   async createRoom(): Promise<void> {
     try {
-      let room = await this.client.create("basic", {
+      let room = await this.$store.state.client!.create("basic", {
         username: this.$refs.inputUsername.value,
         creator: true,
       });
-      this.room = room;
+      this.$store.commit("updateRoom", room);
       this.bindServerListener();
     } catch (e) {
       console.error("join error", e);
@@ -155,7 +157,7 @@ export default class HelloWorld extends Vue {
         localStorage.removeItem("player_infos");
         this.connect();
       } else {
-        if (this.$refs.inputRoomID.value != item.roomId) {
+        if (this.$refs.inputRoomID.value != item.roomID) {
           this.connect();
         } else {
           this.reconnect(item);
@@ -168,10 +170,13 @@ export default class HelloWorld extends Vue {
 
   async connect(): Promise<void> {
     try {
-      let room = await this.client.joinById(this.$refs.inputRoomID.value, {
-        username: this.$refs.inputUsername.value,
-      });
-      this.room = room;
+      let room = await this.$store.state.client!.joinById(
+        this.$refs.inputRoomID.value,
+        {
+          username: this.$refs.inputUsername.value,
+        }
+      );
+      this.$store.commit("updateRoom", room);
       this.bindServerListener();
     } catch (e) {
       console.error("join error", e);
@@ -180,11 +185,11 @@ export default class HelloWorld extends Vue {
 
   async reconnect(item: any): Promise<void> {
     try {
-      const room = await this.client.reconnect(
+      const room = await this.$store.state.client!.reconnect(
         this.$refs.inputUsername.value,
         item.data.id
       );
-      this.room = room;
+      this.$store.commit("updateRoom", room);
       this.bindServerListener();
     } catch (e) {
       console.error("join error", e);
@@ -192,15 +197,18 @@ export default class HelloWorld extends Vue {
   }
 
   sendToServer(type: string, content: string): void {
-    if (this.room != null) {
-      this.room.send("clientPacket", { type: type, content: content });
+    if (this.$store.state.room != null) {
+      this.$store.state.room.send("clientPacket", {
+        type: type,
+        content: content,
+      });
     }
   }
 
   copyCode(): void {
-    console.log(this.room.id);
+    console.log(this.$store.state.room!.id);
     const el = document.createElement("textarea");
-    el.value = this.room.id;
+    el.value = this.$store.state.room!.id;
     document.body.appendChild(el);
     el.select();
     document.execCommand("copy");
@@ -210,10 +218,15 @@ export default class HelloWorld extends Vue {
   sendChat(e: any): void {
     if (this.$refs.inputChat !== undefined) {
       if (e.code === "Enter") {
-        if (this.$refs.inputChat.value !== "") {
+        if (
+          this.$refs.inputChat.value !== "" &&
+          this.$store.state.profil !== null
+        ) {
           this.sendToServer(
             "chat",
-            this.player.username + ": " + this.$refs.inputChat.value
+            this.$store.state.profil.username +
+              ": " +
+              this.$refs.inputChat.value
           );
           this.$refs.inputChat.value = "";
         }
