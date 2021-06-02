@@ -74,7 +74,9 @@ export default class BasicRoom extends Room<RoomState> {
     }
 
     // Cleanup callback, called after there are no more clients in the room. (see `autoDispose`)
-    onDispose(): void { }
+    onDispose(): void {
+        console.log(`No more clients in the room (${this.roomId}), it disposed!`)
+    }
 
     ownBroadcast(datas: { type: string, content: any }): void {
         this.broadcast("serverPacket", datas)
